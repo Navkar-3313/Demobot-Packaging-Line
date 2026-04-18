@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Maintenance Assistant</title>
+
+<style>
+  body { font-family: Arial, sans-serif; background: #ece5dd; margin: 0; }
+  .chat-container { max-width: 450px; height: 100vh; margin: auto; display: flex; flex-direction: column; background: #f0f0f0; }
+  .header { background: #2596be; color: white; padding: 14px; font-weight: bold; text-align: center; }
+  .messages { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
+  .message { padding: 10px 14px; margin: 6px 0; max-width: 85%; border-radius: 10px; font-size: 14px; white-space: pre-line; }
+  .user { align-self: flex-end; background: #9fd8ed; }
+  .bot { align-self: flex-start; background: #ffffff; }
+  .input-area { display: flex; padding: 10px; background: #f0f0f0; }
+  input, select { flex: 1; padding: 10px; border-radius: 20px; border: none; outline: none; }
+  button { margin-left: 10px; width: 40px; border-radius: 50%; border: none; background: #2596be; color: white; cursor: pointer; }
+</style>
+</head>
+
+<body>
+
+<div class="chat-container">
+  <div class="header">Maintenance Assistant</div>
+
+  <div class="messages" id="messages">
+    <div class="message bot">
+      Hi 👋  
+      Select a machine from the list below to get started.
+    </div>
+
+    <!-- MACHINE DROPDOWN -->
+    <div class="message bot" id="machineSelectBox">
+      <strong>Select Machine:</strong><br><br>
+      <select id="machineSelect" onchange="machineChosen()">
+        <option value="">-- Choose Machine --</option>
+        <option>Strapping Machine 1</option>
+        <option>Strapping Machine 2</option>
+        <option>Strapping Machine 3</option>
+        <option>Strapping Machine 4</option>
+        <option>VP</option>
+        <option>VL</option>
+        <option>Winding Machine</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <input id="userInput" placeholder="Type here..." disabled />
+    <button onclick="sendMessage()">➤</button>
+  </div>
+</div>
+
+<script>
+// ============================================
+// EMBEDDED ALARM LIST (From your CSV)
+// ============================================
+const alarms = [
+  { machine:"Strapping Machine 1", alarm:"pet strap stucking at guide rails", action:"Unfeed the strap, then check manually where the strap is sticking. Adjust guide rails. Reset machine." },
+  { machine:"Strapping Machine 1", alarm:"arrow slot photo electric sensor alarm", action:"Check through-beam photoelectric sensor. Clean lens. Check alignment. Reset machine." },
+  { machine:"Strapping Machine 1", alarm:"pet strap is not feeding in the machine", action:"Remove L guard. Clean PET debris. Push PET manually with pliers while feeding. Cut excess PET. Reset machine." },
+
+  { machine:"Strapping Machine 2", alarm:"pet strap stucking at guide rails", action:"Unfeed strap, check manually where stuck, adjust guide rails, reset machine." },
+  { machine:"Strapping Machine 2", alarm:"arrow slot photo electric sensor alarm", action:"Check sensor, clean lens, check alignment, reset machine." },
+  { machine:"Strapping Machine 2", alarm:"pet strap is not feeding in the machine", action:"Remove L guard, clean PET debris, push PET manually, cut excess PET, reset machine." },
+
+  { machine:"Strapping Machine 3", alarm:"pet strap stucking at guide rails", action:"Unfeed strap, check manually where stuck, adjust guide rails, reset." },
+  { machine:"Strapping Machine 3", alarm:"arrow slot photo electric sensor alarm", action:"Check sensor, clean lens, check alignment, reset." },
+  { machine:"Strapping Machine 3", alarm:"l bracket missing on the pallet", action:"Check L bracket pusher cylinder. Check suction cups. Replace if damaged. Check alignment & clearance." },
+  { machine:"Strapping Machine 3", alarm:"pet strap is not feeding in the machine", action:"Remove L guard, clean PET debris, push PET manually, cut excess, reset." },
+
+  { machine:"Strapping Machine 4", alarm:"pet strap stucking at guide rails", action:"Unfeed strap, inspect manually, adjust guide rails, reset." },
+  { machine:"Strapping Machine 4", alarm:"arrow slot photo electric sensor alarm", action:"Check sensor, clean lens, check alignment, reset." },
+  { machine:"Strapping Machine 4", alarm:"pet strap is not feeding in the machine", action:"Remove L guard, clean PET debris, push PET manually, cut excess PET, reset." },
+  { machine:"Strapping Machine 4", alarm:"l bracket missing on the pallet", action:"Check L bracket pusher, vacuum cups, replace damaged parts, adjust alignment & clearance." },
+
+  { machine:"VP", alarm:"wooden pallet is not moving forward from the entry conveyor", action:"Check automatic process step 10, check sensors, manually remove pallet, reset machine." },
+  { machine:"VP", alarm:"inlet entry alarm", action:"Check and align light curtain sensors. Reset." },
+
+  { machine:"VL", alarm:"pallet stuck at 0 degree conveyor", action:"Unclamp pallet, move blocking cylinder, manually move pallet, check sensors, reset machine." },
+  { machine:"VL", alarm:"hydaulic oil leakage", action:"Find leaking part, replace pipe or seals, top up oil, reset." },
+  { machine:"VL", alarm:"wooden pallet is not moving forward to the 0 degree conveyor", action:"Check automatic process step 5, stop machine, reset, switch to auto mode, press start." },
+
+  { machine:"Winding Machine", alarm:"wrapping film is breaking off", action:"Home reset, remove film roll, check locking mechanism and motor, replace film roll." },
+  { machine:"Winding Machine", alarm:"wrapping film is not clamping", action:"Check crocodile clamps, replace damaged rubber pads, reset." },
+  { machine:"Winding Machine", alarm:"wrapping film is not cutting properly", action:"Check heating wire & pads, remove residue, tighten or replace wire." }
+];
+
+// =======================================
+// MACHINE SELECTION
+// =======================================
+let selectedMachine = "";
+
+function machineChosen() {
+  const machine = document.getElementById("machineSelect").value;
+  if (!machine) return;
+
+  selectedMachine = machine;
+
+  addMessage(`Selected Machine: ${machine}`, "user");
+  addMessage(`Great! Now tell me the alarm or issue for ${machine}.`, "bot");
+
+  document.getElementById("userInput").disabled = false; // enable typing
+}
+
+// =======================================
+// FIND ALARM FOR SELECTED MACHINE
+// =======================================
+function findAlarm(input) {
+  const text = input.toLowerCase();
+
+  const filtered = alarms.filter(a => a.machine === selectedMachine);
+
+  let match =
+    filtered.find(a => a.alarm === text) ||
+    filtered.find(a => a.alarm.includes(text)) ||
+    filtered.find(a => text.includes(a.alarm));
+
+  if (!match) {
+    return `❌ No matching alarm found for ${selectedMachine}.
+
+Try:
+• Using fewer words  
+• Checking spelling  
+• Using keywords from the alarm message`;
+  }
+
+  return `✅ Alarm Found for ${selectedMachine}
+
+🔹 Issue:
+${match.alarm}
+
+🔧 Recommended Action:
+${match.action}
+
+⚠️ Ensure safety procedures before inspection.`;
+}
+
+// =======================================
+// CHAT MESSAGE LOGIC
+// =======================================
+function sendMessage() {
+  const input = document.getElementById("userInput");
+  const text = input.value.trim();
+  if (!text) return;
+
+  addMessage(text, "user");
+  input.value = "";
+
+  setTimeout(() => {
+    const reply = findAlarm(text);
+    addMessage(reply, "bot");
+  }, 500);
+}
+
+function addMessage(text, sender) {
+  const msg = document.createElement("div");
+  msg.className = `message ${sender}`;
+  msg.innerText = text;
+  document.getElementById("messages").appendChild(msg);
+  msg.scrollIntoView();
+}
+</script>
+
+</body>
+</html>
